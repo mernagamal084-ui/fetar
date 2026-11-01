@@ -1,0 +1,20 @@
+import { chromium } from 'playwright';
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path';
+const root = path.resolve('dist'); const shim = fs.readFileSync('test/gsap-shim.js','utf8');
+const srv = http.createServer((q,r)=>{ let f=path.join(root,q.url==='/'?'index.html':q.url.split('?')[0]); fs.readFile(f,(e,d)=>{ if(e){r.writeHead(404);r.end();return;} r.writeHead(200,{'content-type':f.endsWith('.html')?'text/html':f.endsWith('.webp')?'image/webp':'text/plain'}); r.end(d);});}).listen(8123);
+const [,, mode='desk', plan='default'] = process.argv;
+const vp = mode==='mob' ? {width:390,height:844} : {width:1440,height:900};
+const b = await chromium.launch(); const ctx = await b.newContext({viewport:vp, deviceScaleFactor:1, hasTouch:mode==='mob', isMobile:mode==='mob'});
+const pg = await ctx.newPage();
+const errs=[]; pg.on('pageerror',e=>errs.push('PAGEERR '+e.message)); pg.on('console',m=>{if(m.type()==='error')errs.push('CONSOLE '+m.text())});
+await pg.route(/cdnjs.*gsap\.min\.js/, r=>r.fulfill({contentType:'text/javascript',body:shim}));
+await pg.route(/cdnjs.*ScrollTrigger\.min\.js/, r=>r.fulfill({contentType:'text/javascript',body:'/*shim*/'}));
+await pg.route(/fonts\.(googleapis|gstatic)/, r=>r.abort());
+await pg.goto('http://localhost:8123/'); await pg.waitForTimeout(3500);
+const info = await pg.evaluate(()=>{const o={};for(const k of ['street','signatures','ingredients','finale']){const s=ScrollTrigger.getById(k); if(s) o[k]=[s.start,s.end];} o.menu=document.getElementById('menu').getBoundingClientRect().top+scrollY; o.xp=document.getElementById('experience').getBoundingClientRect().top+scrollY; o.H=document.documentElement.scrollHeight; return o;});
+console.log(JSON.stringify(info));
+const shots = JSON.parse(process.argv[3]||'[]');
+const lerp=(a,t)=>a[0]+(a[1]-a[0])*t;
+for (const [name,key,t,off] of shots){ if(key==='menu'||key==='xp'||key==='grid'||key==='table'){ const id={menu:'menu',xp:'experience',grid:'menu',table:'experience'}[key]; const sel=key==='grid'?'.mgrid':key==='table'?'.xp-table':'#'+id; await pg.evaluate(([sel,o])=>window.scrollTo(0,document.querySelector(sel).getBoundingClientRect().top+scrollY+o-70),[sel,off||0]); } else { const y=lerp(info[key],t); await pg.evaluate(y=>window.scrollTo(0,y),y);}  await pg.waitForTimeout(900); await pg.screenshot({path:`/tmp/shots/${mode}-${name}.png`}); }
+console.log(errs.join('\n')||'no errors');
+await b.close(); srv.close();

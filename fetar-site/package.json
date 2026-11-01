@@ -1,0 +1,9 @@
+{
+  "name": "fetar-el-hetta",
+  "private": true,
+  "version": "1.0.0",
+  "description": "El Fetar El Masry — scroll-driven Egyptian street-breakfast site (React + GSAP/ScrollTrigger)",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "react": "^19.0.0", "react-dom": "^19.0.0" },
+  "devDependencies": { "esbuild": "^0.25.0" }
+}
